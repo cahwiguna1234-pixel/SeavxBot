@@ -1,0 +1,34 @@
+# SeavxBot configuration template.
+# Copy this file to config.toml and fill in your own values.
+# config.toml is gitignored so your number never reaches the repository.
+bot_name = "SeavxBot"
+
+# Command prefixes (supports multiple prefixes, e.g. ["!", ".", "#", "/"])
+prefixes = ["!", ".", "#", "/"]
+
+# Owner WhatsApp phone numbers (with country code, digits only)
+owners = [
+  "628123456789"
+]
+
+[auth]
+dir = "auth_info"
+# Default method when not registered: "pairing" or "qr" (leave empty to ask interactively)
+default_method = ""
+# Phone number for pairing code (if default_method is "pairing")
+phone_number = ""
+
+[logging]
+# Pino logger level: "fatal" | "error" | "warn" | "info" | "debug" | "trace"
+level = "warn"
+
+[features]
+# Automatically mark incoming messages as read (blue tick / ACK)
+read_message = true
+
+[messages]
+owner_only = "🚩 This command is reserved for the bot owner."
+admin_only = "🚩 Group admin privileges required."
+group_only = "🚩 This command can only be used in groups."
+bot_admin_only = "🚩 Bot requires admin privileges to perform this action."
+error = "🚩 An error occurred while executing the command."
