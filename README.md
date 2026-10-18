@@ -1,6 +1,15 @@
 # seavxbot
 
+![Bun](https://img.shields.io/badge/runtime-Bun-000000?logo=bun&logoColor=white)
+![TypeScript](https://img.shields.io/badge/language-TypeScript-3178C6?logo=typescript&logoColor=white)
+![Baileys](https://img.shields.io/badge/engine-Baileys-25D366?logo=whatsapp&logoColor=white)
+
 A lean WhatsApp bot powered by Bun, TypeScript, and `@whiskeysockets/baileys`.
+
+- Multi-device login: pairing code or terminal QR
+- Config via `config.toml`, no parser dependency
+- Commands pre-loaded into memory, O(1) lookup per message
+- Built-in guards: owner, admin, group-only, bot-admin
 
 ## Setup
 
