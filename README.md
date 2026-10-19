@@ -11,7 +11,6 @@ A lean WhatsApp bot powered by Bun, TypeScript, and `@whiskeysockets/baileys`.
 - Config via `config.toml`, no parser dependency
 - Commands pre-loaded into memory, O(1) lookup per message
 - Built-in guards: owner, admin, group-only, bot-admin
-- Website screenshots: `!ss <url>` renders a page to a PNG
 
 ## Setup
 
