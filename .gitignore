@@ -38,3 +38,9 @@ auth_info/
 
 # Local bot configuration (holds owner phone numbers)
 config.toml
+
+# SQLite database (per-group settings)
+data/
+
+# Local spec/plan artifacts
+.superpowers/

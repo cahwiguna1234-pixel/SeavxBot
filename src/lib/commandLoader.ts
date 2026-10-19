@@ -22,6 +22,7 @@ export async function loadCommands(dir = path.resolve(import.meta.dir, "../comma
     }
 
     if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".js")) continue;
+    if (entry.name.includes(".test.") || entry.name.includes(".spec.")) continue;
 
     const module = await import(`${fullPath}?t=${Date.now()}`);
     const cmd: Command = module.default || Object.values(module)[0];

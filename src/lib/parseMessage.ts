@@ -3,6 +3,10 @@ import {
   type WASocket,
   type GroupMetadata,
   type proto,
+  isPnUser,
+  isLidUser,
+  isHostedPnUser,
+  isHostedLidUser,
 } from "@whiskeysockets/baileys";
 import {
   unwrapMessageContent,
@@ -62,16 +66,25 @@ export async function parseMessage(
 
   const isGroup = chatJid.endsWith("@g.us");
 
-  // Baileys v7 stores the actual phone JID in participantAlt (e.g. 628xxx@s.whatsapp.net)
-  const rawKey = key as proto.IMessageKey & { participantAlt?: string };
-  const rawMsg = msg as WAMessage & { participantAlt?: string };
+  // Baileys v7 exposes both identities per message: whichever one is *not* used
+  // to address the stanza lands in an `*Alt` field. A LID-addressed DM therefore
+  // has remoteJid = 2024…@lid and remoteJidAlt = 628…@s.whatsapp.net, while the
+  // reverse happens for PN-addressed chats. Pick by suffix instead of by chat
+  // type so the owner check always receives a phone number, never a LID.
+  const candidates = [
+    key.participantAlt,
+    key.remoteJidAlt,
+    key.participant,
+    chatJid,
+  ].filter((jid): jid is string => Boolean(jid));
 
-  const senderLid = isGroup ? key.participant || msg.participant || "" : "";
+  // `@hosted` / `@hosted.lid` are the hosted-account forms of the same two
+  // identities, so they are matched here too — otherwise a hosted sender falls
+  // through to the chat JID and every sender in the chat looks identical.
   const senderPn =
-    rawKey.participantAlt ||
-    rawMsg.participantAlt ||
-    (isGroup ? "" : chatJid) ||
-    senderLid;
+    candidates.find((jid) => isPnUser(jid) || isHostedPnUser(jid)) ?? "";
+  const senderLid =
+    candidates.find((jid) => isLidUser(jid) || isHostedLidUser(jid)) ?? "";
 
   const senderJid = senderPn || senderLid || chatJid;
   const fromMe = Boolean(key.fromMe);
@@ -101,7 +114,8 @@ export async function parseMessage(
     content?.extendedTextMessage?.contextInfo ||
     content?.imageMessage?.contextInfo ||
     content?.videoMessage?.contextInfo ||
-    content?.documentMessage?.contextInfo;
+    content?.documentMessage?.contextInfo ||
+    content?.interactiveMessage?.contextInfo;
 
   const mentions = contextInfo?.mentionedJid || [];
 

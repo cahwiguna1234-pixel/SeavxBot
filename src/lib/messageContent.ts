@@ -19,8 +19,24 @@ export function unwrapMessageContent(
   return content;
 }
 
-export function extractMessageBody(content: proto.IMessage | undefined): string {
+export function extractMessageBody(
+  content: proto.IMessage | undefined,
+): string {
   if (!content) return "";
+
+  // A tapped native-flow button arrives as paramsJson; the "id" field carries
+  // whatever the button declared, usually the command it should trigger.
+  const flowParams =
+    content.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson;
+  if (flowParams) {
+    try {
+      const parsed = JSON.parse(flowParams) as { id?: unknown };
+      if (typeof parsed.id === "string") return parsed.id;
+    } catch {
+      // Malformed payloads fall through to the regular body extraction.
+    }
+  }
+
   return (
     content.conversation ||
     content.extendedTextMessage?.text ||

@@ -4,6 +4,7 @@ import {
   jidNormalizedUser,
   areJidsSameUser,
 } from "@whiskeysockets/baileys";
+import { getGroupMetadata } from "@/lib/groupCache";
 
 export interface ResolvedPermissions {
   isOwner: boolean;
@@ -24,6 +25,19 @@ export interface ResolvePermissionsParams {
   ownerNumbers?: string[];
 }
 
+/**
+ * Identity comparison that refuses empty input. `areJidsSameUser("", "")` is
+ * `true` — it only compares the decoded user part — so an absent sender LID
+ * would otherwise match an absent participant LID.
+ */
+function sameUser(
+  left: string | undefined,
+  right: string | undefined,
+): boolean {
+  if (!left || !right) return false;
+  return areJidsSameUser(left, right);
+}
+
 export async function resolvePermissions({
   sock,
   chatJid,
@@ -42,8 +56,8 @@ export async function resolvePermissions({
   const ownerList = ownerNumbers.map((num) => num.replace(/\D/g, ""));
   const isOwner = Boolean(
     fromMe ||
-      (senderNumber && ownerList.includes(senderNumber)) ||
-      (botJid && areJidsSameUser(senderJid, botJid)),
+    (senderNumber && ownerList.includes(senderNumber)) ||
+    (botJid && areJidsSameUser(senderJid, botJid)),
   );
 
   let isAdmin = false;
@@ -53,18 +67,20 @@ export async function resolvePermissions({
 
   if (isGroup) {
     try {
-      groupMetadata = await sock.groupMetadata(chatJid);
-      const participants = groupMetadata.participants || [];
+      groupMetadata = await getGroupMetadata(sock, chatJid);
+      const participants = groupMetadata?.participants || [];
 
       for (const p of participants) {
-        const participantJid = p.id;
-        const participantPn =
-          (p as { pn?: string; jid?: string }).pn || participantJid;
+        // Baileys builds a participant as `{ id, phoneNumber, lid, … }`: `id` is
+        // whichever form the group addresses members by, and the other identity
+        // rides along in `phoneNumber` / `lid`. None of the three is guaranteed,
+        // so every known identity is compared against every known sender one.
+        const participantIds = [p.id, p.phoneNumber, p.lid];
+        const senderIds = [senderJid, senderPn, senderLid];
 
-        const isSenderMatch =
-          areJidsSameUser(participantJid, senderJid) ||
-          areJidsSameUser(participantJid, senderLid) ||
-          areJidsSameUser(participantPn, senderPn);
+        const isSenderMatch = participantIds.some((participantJid) =>
+          senderIds.some((senderId) => sameUser(participantJid, senderId)),
+        );
 
         if (isSenderMatch) {
           if (p.admin === "admin") isAdmin = true;
@@ -74,13 +90,11 @@ export async function resolvePermissions({
           }
         }
 
-        const isBotMatch =
-          (botJid &&
-            (areJidsSameUser(participantJid, botJid) ||
-              areJidsSameUser(participantPn, botJid))) ||
-          (botLid &&
-            (areJidsSameUser(participantJid, botLid) ||
-              areJidsSameUser(participantPn, botLid)));
+        const isBotMatch = participantIds.some(
+          (participantJid) =>
+            sameUser(participantJid, botJid) ||
+            sameUser(participantJid, botLid),
+        );
 
         if (isBotMatch && (p.admin === "admin" || p.admin === "superadmin")) {
           isBotAdmin = true;

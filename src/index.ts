@@ -4,23 +4,31 @@ import {
   makeCacheableSignalKeyStore,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  type WASocket,
+  isJidStatusBroadcast,
+  isJidNewsletter,
+  type AnyMessageContent,
   type CacheStore,
+  type MiscMessageGenerationOptions,
+  type WAMessage,
+  type WASocket,
 } from "@whiskeysockets/baileys";
-import { Boom } from "@hapi/boom";
+import type { Boom } from "@hapi/boom";
 import NodeCache from "@cacheable/node-cache";
 import pino from "pino";
 import QRCode from "qrcode";
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { parseMessage } from "@/lib/parseMessage";
+import { parseMessage, type ParsedMessage } from "@/lib/parseMessage";
 import { logToFile } from "@/lib/logger";
 import { botConfig } from "@/lib/config";
 import { loadCommands, getCommand } from "@/lib/commandLoader";
-import type {
-  AnyMessageContent,
-  MiscMessageGenerationOptions,
-} from "@whiskeysockets/baileys";
+import { getGroupMetadata, invalidateGroupMetadata } from "@/lib/groupCache";
+import { getGroupSettings } from "@/lib/db";
+import { handleParticipantsUpdate } from "@/lib/greeting";
+import type { Command } from "@/lib/types";
+
+const PAIRING_CODE_DELAY_MS = 3000;
+const PHONE_PROMPT = "Phone number (e.g. 628xxx): ";
 
 const logger = pino({ level: botConfig.logging.level || "warn" });
 const msgRetryCounterCache = new NodeCache({
@@ -28,9 +36,154 @@ const msgRetryCounterCache = new NodeCache({
   useClones: false,
 }) as unknown as CacheStore;
 
-async function startBot(): Promise<void> {
-  await loadCommands();
+type AuthMethod = "pairing" | "qr";
 
+interface AuthChoice {
+  method: AuthMethod;
+  phone: string;
+}
+
+const digits = (value?: string): string => (value ?? "").replace(/\D/g, "");
+
+/** Reads one line from the terminal; the interface is closed per call so no
+ *  input stream lingers across reconnects. */
+async function promptLine(question: string): Promise<string> {
+  const rl = readline.createInterface({ input, output });
+  try {
+    return (await rl.question(question)).trim();
+  } finally {
+    rl.close();
+  }
+}
+
+/** Resolves how this run authenticates, prompting only for what config misses. */
+async function resolveAuth(isRegistered: boolean): Promise<AuthChoice | null> {
+  if (isRegistered) return null;
+
+  const configured = botConfig.auth.default_method;
+  let method: AuthMethod;
+
+  if (configured === "pairing" || configured === "qr") {
+    method = configured;
+  } else {
+    console.log("\nChoose authentication method:");
+    console.log("1. Pairing Code");
+    console.log("2. QR Code");
+    method = (await promptLine("Select (1 or 2): ")) === "1" ? "pairing" : "qr";
+  }
+
+  const phone = digits(botConfig.auth.phone_number);
+  const resolvedPhone =
+    method === "pairing" && !phone
+      ? digits(await promptLine(PHONE_PROMPT))
+      : phone;
+
+  return { method, phone: resolvedPhone };
+}
+
+async function renderQR(QR: string): Promise<void> {
+  console.log("\nScan this QR code with WhatsApp:\n");
+  try {
+    const QRString = await QRCode.toString(QR, {
+      type: "terminal",
+      small: true,
+      margin: 0,
+      errorCorrectionLevel: "L",
+    });
+    console.log(QRString);
+  } catch (err) {
+    console.error("Failed to render terminal QR:", err);
+  }
+}
+
+function createReply(sock: WASocket, msg: ParsedMessage) {
+  return async (
+    content: string | AnyMessageContent,
+    options?: MiscMessageGenerationOptions,
+  ) => {
+    const res = await sock.sendMessage(
+      msg.chatJid,
+      typeof content === "string" ? { text: content } : content,
+      { quoted: msg.raw, ...options },
+    );
+    logToFile("SENT_REPLY", res);
+    return res;
+  };
+}
+
+/** First unmet guard for `cmd`, or undefined when the sender may run it. */
+function denyReason(cmd: Command, msg: ParsedMessage): string | undefined {
+  const msgs = botConfig.messages;
+
+  if (cmd.ownerOnly && !msg.isOwner) {
+    return msgs?.owner_only || "🚩 Owner access required.";
+  }
+  if (cmd.groupOnly && !msg.isGroup) {
+    return msgs?.group_only || "🚩 Group chat required.";
+  }
+  if (cmd.adminOnly && !msg.isAdmin && !msg.isOwner) {
+    return msgs?.admin_only || "🚩 Group admin required.";
+  }
+  if (cmd.botAdminOnly && !msg.isBotAdmin) {
+    return msgs?.bot_admin_only || "🚩 Bot admin privileges required.";
+  }
+
+  return undefined;
+}
+
+function describeIncoming(msg: ParsedMessage): string {
+  const cmd = msg.isCmd ? msg.command : "-";
+  return (
+    `[${msg.chatJid}] ${msg.pushName} (${msg.type}) [Cmd: ${cmd}] ` +
+    `[Owner: ${msg.isOwner}, Admin: ${msg.isAdmin}, BotAdmin: ${msg.isBotAdmin}]: ` +
+    msg.body
+  );
+}
+
+async function handleMessage(sock: WASocket, raw: WAMessage): Promise<void> {
+  logToFile("RAW_UPSERT", raw);
+
+  // Own messages (linked devices, peer-data echoes) never dispatch.
+  if (raw.key?.fromMe) return;
+
+  const msg = await parseMessage(sock, raw, {
+    prefixes: botConfig.prefixes,
+    ownerNumbers: botConfig.owners,
+  });
+  if (!msg) return;
+
+  logToFile("PARSED_MSG", msg);
+
+  if (botConfig.features?.read_message) {
+    await sock.readMessages([msg.key]);
+  }
+
+  console.log(describeIncoming(msg));
+
+  const reply = createReply(sock, msg);
+
+  if (!msg.isCmd) return;
+
+  const cmd = getCommand(msg.command);
+  if (!cmd) return;
+
+  const denial = denyReason(cmd, msg);
+
+  if (denial) {
+    await reply(denial);
+    return;
+  }
+
+  try {
+    await cmd.run({ sock, msg, reply });
+  } catch (err) {
+    console.error(`Error executing command [${cmd.name}]:`, err);
+    logToFile("CMD_ERROR", { cmd: cmd.name, error: String(err) });
+    await reply(botConfig.messages?.error || "🚩 Command execution failed.");
+  }
+}
+
+async function connect(): Promise<void> {
   const { state, saveCreds } = await useMultiFileAuthState(
     botConfig.auth.dir || "auth_info",
   );
@@ -38,38 +191,8 @@ async function startBot(): Promise<void> {
   console.log(`Using WA v${version.join(".")}, isLatest: ${isLatest}`);
 
   const isRegistered = Boolean(state.creds.registered || state.creds.me?.id);
-  let authChoice =
-    botConfig.auth.default_method === "pairing"
-      ? "1"
-      : botConfig.auth.default_method === "qr"
-        ? "2"
-        : "";
-  let phoneNumber = botConfig.auth.phone_number?.replace(/\D/g, "") || "";
-
-  if (!isRegistered && !authChoice) {
-    const rl = readline.createInterface({ input, output });
-    try {
-      console.log("\nChoose authentication method:");
-      console.log("1. Pairing Code");
-      console.log("2. QR Code");
-      authChoice = (await rl.question("Select (1 or 2): ")).trim();
-
-      if (authChoice === "1" && !phoneNumber) {
-        const raw = await rl.question("Phone number (e.g. 628xxx): ");
-        phoneNumber = raw.replace(/\D/g, "");
-      }
-    } finally {
-      rl.close();
-    }
-  } else if (!isRegistered && authChoice === "1" && !phoneNumber) {
-    const rl = readline.createInterface({ input, output });
-    try {
-      const raw = await rl.question("Phone number (e.g. 628xxx): ");
-      phoneNumber = raw.replace(/\D/g, "");
-    } finally {
-      rl.close();
-    }
-  }
+  const auth = await resolveAuth(isRegistered);
+  const pairingPhone = auth?.method === "pairing" ? auth.phone : "";
 
   const sock: WASocket = makeWASocket({
     version,
@@ -80,150 +203,88 @@ async function startBot(): Promise<void> {
     },
     msgRetryCounterCache,
     generateHighQualityLinkPreview: true,
+    // Status stories and channels are never bot input; dropping them here keeps
+    // them out of the decrypt path, which otherwise errors on unknown senders.
+    shouldIgnoreJid: (jid) => isJidStatusBroadcast(jid) || isJidNewsletter(jid),
+    // Every group send needs the participant list for sender-key fan-out.
+    // Serving it from the cache avoids a second IQ round trip per message.
+    cachedGroupMetadata: (jid) => getGroupMetadata(sock, jid),
   });
 
-  if (!isRegistered && authChoice === "1" && phoneNumber) {
+  sock.ev.on("creds.update", saveCreds);
+
+  if (pairingPhone) {
+    // The socket must finish its handshake before it accepts this request.
     setTimeout(async () => {
       try {
-        const code = await sock.requestPairingCode(phoneNumber);
+        const code = await sock.requestPairingCode(pairingPhone);
         console.log(`\nYour Pairing Code: ${code}\n`);
       } catch (err) {
         console.error("Failed to request pairing code:", err);
       }
-    }, 3000);
+    }, PAIRING_CODE_DELAY_MS);
   }
 
-  sock.ev.on("creds.update", saveCreds);
+  sock.ev.on("connection.update", ({ connection, lastDisconnect, qr: QR }) => {
+    if (QR && !isRegistered && auth?.method !== "pairing") void renderQR(QR);
 
-  sock.ev.on(
-    "connection.update",
-    async ({ connection, lastDisconnect, qr: QR }) => {
-      if (QR && !isRegistered && authChoice !== "1") {
-        console.log("\nScan this QR code with WhatsApp:\n");
-        try {
-          const QRString = await QRCode.toString(QR, {
-            type: "terminal",
-            small: true,
-            margin: 0,
-            errorCorrectionLevel: "L",
-          });
-          console.log(QRString);
-        } catch (err) {
-          console.error("Failed to render terminal QR:", err);
-        }
-      }
+    if (connection === "open") {
+      console.log("Connected to WhatsApp successfully!");
+      return;
+    }
+    if (connection !== "close") return;
 
-      if (connection === "close") {
-        const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
-        const shouldReconnect =
-          statusCode !== DisconnectReason.loggedOut &&
-          statusCode !== DisconnectReason.forbidden;
+    const statusCode = (lastDisconnect?.error as Boom | undefined)?.output
+      ?.statusCode;
+    const reconnecting =
+      statusCode !== DisconnectReason.loggedOut &&
+      statusCode !== DisconnectReason.forbidden;
 
-        console.log(
-          `Connection closed (${statusCode}). Reconnecting: ${shouldReconnect}`,
-        );
+    console.log(
+      `Connection closed (${statusCode}). Reconnecting: ${reconnecting}`,
+    );
 
-        if (shouldReconnect) {
-          startBot();
-        } else {
-          console.log(
-            "Session terminated. Remove auth_info to re-authenticate.",
-          );
-        }
-      } else if (connection === "open") {
-        console.log("Connected to WhatsApp successfully!");
-      }
-    },
-  );
+    if (!reconnecting) {
+      console.log("Session terminated. Remove auth_info to re-authenticate.");
+      return;
+    }
+
+    void connect().catch((err) => console.error("Reconnect failed:", err));
+  });
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return;
 
     for (const raw of messages) {
-      logToFile("RAW_UPSERT", raw);
-
-      const msg = await parseMessage(sock, raw, {
-        prefixes: botConfig.prefixes,
-        ownerNumbers: botConfig.owners,
-      });
-      if (!msg) continue;
-
-      logToFile("PARSED_MSG", msg);
-
-      if (msg.fromMe) continue;
-
-      if (botConfig.features?.read_message) {
-        await sock.readMessages([msg.key]);
-      }
-
-      const line = `[${msg.chatJid}] ${msg.pushName} (${msg.type}) [Cmd: ${msg.isCmd ? msg.command : "-"}] [Owner: ${msg.isOwner}, Admin: ${msg.isAdmin}, BotAdmin: ${msg.isBotAdmin}]: ${msg.body}`;
-      console.log(line);
-
-      if (msg.isCmd) {
-        const cmd = getCommand(msg.command);
-        if (cmd) {
-          const msgs = botConfig.messages;
-
-          if (cmd.ownerOnly && !msg.isOwner) {
-            await sock.sendMessage(
-              msg.chatJid,
-              { text: msgs?.owner_only || "🚩 Owner access required." },
-              { quoted: msg.raw },
-            );
-            continue;
-          }
-          if (cmd.groupOnly && !msg.isGroup) {
-            await sock.sendMessage(
-              msg.chatJid,
-              { text: msgs?.group_only || "🚩 Group chat required." },
-              { quoted: msg.raw },
-            );
-            continue;
-          }
-          if (cmd.adminOnly && !msg.isAdmin && !msg.isOwner) {
-            await sock.sendMessage(
-              msg.chatJid,
-              { text: msgs?.admin_only || "🚩 Group admin required." },
-              { quoted: msg.raw },
-            );
-            continue;
-          }
-          if (cmd.botAdminOnly && !msg.isBotAdmin) {
-            await sock.sendMessage(
-              msg.chatJid,
-              {
-                text: msgs?.bot_admin_only || "🚩 Bot admin privileges required.",
-              },
-              { quoted: msg.raw },
-            );
-            continue;
-          }
-
-          const reply = async (
-            content: string | AnyMessageContent,
-            opts?: MiscMessageGenerationOptions,
-          ) => {
-            const payload =
-              typeof content === "string" ? { text: content } : content;
-            const res = await sock.sendMessage(msg.chatJid, payload, {
-              quoted: msg.raw,
-              ...opts,
-            });
-            logToFile("SENT_REPLY", res);
-            return res;
-          };
-
-          try {
-            await cmd.run({ sock, msg, reply });
-          } catch (err) {
-            console.error(`Error executing command [${cmd.name}]:`, err);
-            logToFile("CMD_ERROR", { cmd: cmd.name, error: String(err) });
-            await reply(msgs?.error || "🚩 Command execution failed.");
-          }
-        }
+      try {
+        await handleMessage(sock, raw);
+      } catch (err) {
+        console.error("Failed to handle message:", err);
+        logToFile("MESSAGE_ERROR", { id: raw.key?.id, error: String(err) });
       }
     }
   });
+
+  // The cached participant list must never outlive a real membership change.
+  const forget = ({ id }: { id: string }) => invalidateGroupMetadata(id);
+  sock.ev.on("group-participants.update", (update) => {
+    forget(update);
+    // Runs after the invalidation so the greeting reads fresh metadata.
+    void handleParticipantsUpdate(sock, getGroupSettings(), update).catch(
+      (err) => console.error("Greeting handler failed:", err),
+    );
+  });
+  sock.ev.on("groups.update", (updates) => {
+    for (const { id } of updates) if (id) invalidateGroupMetadata(id);
+  });
 }
 
-startBot();
+async function main(): Promise<void> {
+  await loadCommands();
+  await connect();
+}
+
+main().catch((err) => {
+  console.error("Fatal:", err);
+  process.exit(1);
+});

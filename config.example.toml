@@ -22,6 +22,10 @@ phone_number = ""
 # Pino logger level: "fatal" | "error" | "warn" | "info" | "debug" | "trace"
 level = "warn"
 
+[storage]
+# SQLite file holding per-group settings. Created on first run.
+path = "data/seavxbot.db"
+
 [features]
 # Automatically mark incoming messages as read (blue tick / ACK)
 read_message = true
@@ -32,3 +36,9 @@ admin_only = "🚩 Group admin privileges required."
 group_only = "🚩 This command can only be used in groups."
 bot_admin_only = "🚩 Bot requires admin privileges to perform this action."
 error = "🚩 An error occurred while executing the command."
+
+# Default greeting templates. A group can override these with
+# !settings welcometext / !settings goodbyetext.
+# Placeholders: {mention} {name} {group} {count}
+welcome_text = "Welcome {mention} to *{group}*! You are member #{count}."
+goodbye_text = "Goodbye {name}."

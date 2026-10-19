@@ -10,6 +10,9 @@ export interface BotConfig {
   logging: {
     level: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
   };
+  storage?: {
+    path?: string;
+  };
   features?: {
     read_message?: boolean;
   };
@@ -19,6 +22,8 @@ export interface BotConfig {
     group_only?: string;
     bot_admin_only?: string;
     error?: string;
+    welcome_text?: string;
+    goodbye_text?: string;
   };
 }
 
