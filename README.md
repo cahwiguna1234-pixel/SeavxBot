@@ -1,5 +1,6 @@
 # seavxbot
 
+[![CI](https://github.com/seaavey/SeavxBot/actions/workflows/ci.yml/badge.svg)](https://github.com/seaavey/SeavxBot/actions/workflows/ci.yml)
 ![Bun](https://img.shields.io/badge/runtime-Bun-000000?logo=bun&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/language-TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Baileys](https://img.shields.io/badge/engine-Baileys-25D366?logo=whatsapp&logoColor=white)
@@ -28,7 +29,10 @@ paired account. Never commit either.
 ```bash
 bun start        # run the bot
 bun dev          # run with watch mode
+bun run test     # run the test suite
 bun run typecheck
+bun run format        # prettier --write .
+bun run format:check  # prettier --check . (what CI enforces)
 ```
 
 This project was created using `bun init` in bun v1.4.3. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
