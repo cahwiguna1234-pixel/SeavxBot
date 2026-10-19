@@ -32,15 +32,12 @@ function open() {
 }
 
 /** Writes a row the store would never produce, bypassing its guards. */
-function writeRaw(
-  db: Database,
-  jid: string,
-  key: string,
-  value: string,
-): void {
-  db.query(
-    "INSERT INTO group_settings (jid, key, value) VALUES (?, ?, ?)",
-  ).run(jid, key, value);
+function writeRaw(db: Database, jid: string, key: string, value: string): void {
+  db.query("INSERT INTO group_settings (jid, key, value) VALUES (?, ?, ?)").run(
+    jid,
+    key,
+    value,
+  );
 }
 
 describe("createSettingsStore", () => {

@@ -55,7 +55,9 @@ function sock(options: { fail?: boolean } = {}) {
   return { socket: socket as never, sent };
 }
 
-function update(overrides: Partial<ParticipantsUpdate> = {}): ParticipantsUpdate {
+function update(
+  overrides: Partial<ParticipantsUpdate> = {},
+): ParticipantsUpdate {
   return {
     id: GROUP,
     action: "add",
@@ -114,9 +116,7 @@ describe("handleParticipantsUpdate", () => {
     await handleParticipantsUpdate(socket, store(), update());
 
     expect(sent).toHaveLength(1);
-    expect(sent[0]!.text).toBe(
-      "Welcome @628222 to *Test Group*! Member #1.",
-    );
+    expect(sent[0]!.text).toBe("Welcome @628222 to *Test Group*! Member #1.");
     expect(sent[0]!.mentions).toEqual(["628222@s.whatsapp.net"]);
     expect(sent[0]!.jid).toBe(GROUP);
   });
@@ -196,7 +196,9 @@ describe("handleParticipantsUpdate", () => {
     await handleParticipantsUpdate(
       socket,
       store(),
-      update({ participants: [{ id: BOT_PN }, { id: "628222@s.whatsapp.net" }] }),
+      update({
+        participants: [{ id: BOT_PN }, { id: "628222@s.whatsapp.net" }],
+      }),
     );
 
     expect(sent).toHaveLength(1);

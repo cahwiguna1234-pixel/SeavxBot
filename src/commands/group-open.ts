@@ -12,7 +12,9 @@ export const openCommand: Command = {
     // Metadata comes from the 30s cache, kept in sync by `runSettingOp`, so a
     // repeat call inside that window is still caught.
     if (msg.groupMetadata?.announce === false) {
-      await reply("🚩 This group is already open — everyone can send messages.");
+      await reply(
+        "🚩 This group is already open — everyone can send messages.",
+      );
       return;
     }
 

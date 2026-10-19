@@ -35,14 +35,20 @@ CREATE TABLE IF NOT EXISTS group_settings (
 ) WITHOUT ROWID;
 `;
 
-export const ANTILINK_MODES: readonly AntilinkMode[] = ["off", "warn", "delete"];
+export const ANTILINK_MODES: readonly AntilinkMode[] = [
+  "off",
+  "warn",
+  "delete",
+];
 
-const DEFAULT_SETTINGS: Pick<GroupSettings, "welcome" | "goodbye" | "antilink"> =
-  {
-    welcome: false,
-    goodbye: false,
-    antilink: "off",
-  };
+const DEFAULT_SETTINGS: Pick<
+  GroupSettings,
+  "welcome" | "goodbye" | "antilink"
+> = {
+  welcome: false,
+  goodbye: false,
+  antilink: "off",
+};
 
 /**
  * One guard per field. A stored value that fails its guard is treated as

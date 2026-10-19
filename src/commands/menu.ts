@@ -9,7 +9,10 @@ export const menuCommand: Command = {
   run: async ({ reply, msg }) => {
     const prefix = msg.prefix || botConfig.prefixes[0] || "!";
     const list = Array.from(commands.values())
-      .map((c) => `• ${prefix}${c.name}${c.description ? ` - ${c.description}` : ""}`)
+      .map(
+        (c) =>
+          `• ${prefix}${c.name}${c.description ? ` - ${c.description}` : ""}`,
+      )
       .join("\n");
 
     const text = `*${botConfig.bot_name} Menu*\n\nPrefixes: ${botConfig.prefixes.join(" ")}\n\n${list}`;

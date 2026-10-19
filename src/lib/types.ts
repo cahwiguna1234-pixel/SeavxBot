@@ -1,10 +1,17 @@
-import type { WASocket, AnyMessageContent, MiscMessageGenerationOptions } from "@whiskeysockets/baileys";
+import type {
+  WASocket,
+  AnyMessageContent,
+  MiscMessageGenerationOptions,
+} from "@whiskeysockets/baileys";
 import type { ParsedMessage } from "@/lib/parseMessage";
 
 export interface CommandContext {
   sock: WASocket;
   msg: ParsedMessage;
-  reply: (content: string | AnyMessageContent, options?: MiscMessageGenerationOptions) => Promise<unknown>;
+  reply: (
+    content: string | AnyMessageContent,
+    options?: MiscMessageGenerationOptions,
+  ) => Promise<unknown>;
 }
 
 export interface Command {

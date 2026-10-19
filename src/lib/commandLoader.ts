@@ -5,7 +5,9 @@ import type { Command } from "@/lib/types";
 export const commands = new Map<string, Command>();
 export const aliases = new Map<string, string>();
 
-export async function loadCommands(dir = path.resolve(import.meta.dir, "../commands")): Promise<void> {
+export async function loadCommands(
+  dir = path.resolve(import.meta.dir, "../commands"),
+): Promise<void> {
   commands.clear();
   aliases.clear();
 
@@ -22,7 +24,8 @@ export async function loadCommands(dir = path.resolve(import.meta.dir, "../comma
     }
 
     if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".js")) continue;
-    if (entry.name.includes(".test.") || entry.name.includes(".spec.")) continue;
+    if (entry.name.includes(".test.") || entry.name.includes(".spec."))
+      continue;
 
     const module = await import(`${fullPath}?t=${Date.now()}`);
     const cmd: Command = module.default || Object.values(module)[0];

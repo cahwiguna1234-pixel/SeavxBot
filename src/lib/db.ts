@@ -26,7 +26,9 @@ const FALLBACK_GOODBYE = "Goodbye {name}.";
  * bookkeeping table to keep in sync with the schema it describes.
  */
 function migrate(db: Database): void {
-  const row = db.query<{ user_version: number }, []>("PRAGMA user_version").get();
+  const row = db
+    .query<{ user_version: number }, []>("PRAGMA user_version")
+    .get();
   if ((row?.user_version ?? 0) >= SCHEMA_VERSION) return;
 
   db.transaction(() => {

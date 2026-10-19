@@ -37,7 +37,11 @@ export function logToFile(prefix: string, message: unknown): void {
   const content =
     typeof message === "string"
       ? message
-      : JSON.stringify(message, (_key, val) => (typeof val === "bigint" ? val.toString() : val), 2);
+      : JSON.stringify(
+          message,
+          (_key, val) => (typeof val === "bigint" ? val.toString() : val),
+          2,
+        );
 
   logStream.write(`[${timestamp}] [${prefix}]\n${content}\n\n`);
 }
