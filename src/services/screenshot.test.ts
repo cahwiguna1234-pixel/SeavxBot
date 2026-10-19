@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { normalizeSiteUrl } from "@/lib/screenshot";
+import { normalizeSiteUrl } from "@/services/screenshot";
 
 describe("normalizeSiteUrl", () => {
   test("adds a scheme to a bare domain", () => {

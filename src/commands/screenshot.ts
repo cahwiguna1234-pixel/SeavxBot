@@ -1,6 +1,6 @@
 import type { Command } from "@/lib/types";
 import { extractFirstUrl } from "@/lib/extractUrl";
-import { captureScreenshot, normalizeSiteUrl } from "@/lib/screenshot";
+import { captureScreenshot, normalizeSiteUrl } from "@/services/screenshot";
 
 export const screenshotCommand: Command = {
   name: "ss",
