@@ -1,7 +1,10 @@
 import { downloadMediaMessage, type WAMessage } from "@whiskeysockets/baileys";
 import type { Command } from "@/lib/types";
+import { getUsers } from "@/lib/db";
 import { extractFirstUrl } from "@/lib/extractUrl";
 import { unwrapMessageContent } from "@/lib/messageContent";
+import { isPremium } from "@/lib/users";
+import { parseScale, upscaleDenial } from "@/lib/upscaleQuota";
 import { upscale } from "@/scrapers/upscale";
 
 /** WhatsApp media lives behind an encrypted URL, so hand the upscaler the bytes. */
@@ -15,13 +18,21 @@ async function toDataUrl(
 
 export const upscaleCommand: Command = {
   name: "upscale",
-  description: "Upscale an image 2x (reply to it, caption it, or send a URL)",
+  description: "Upscale an image 2x, or 4x with premium (reply, caption, or URL)",
   aliases: ["hd", "remini"],
   run: async ({ msg, reply, react }) => {
     const fail = async (text: string) => {
       await react("❌");
       await reply(text);
     };
+
+    const scale = parseScale(msg.args);
+    const users = getUsers();
+    const user = users.get(msg.senderJid);
+    const premium = user !== null && isPremium(user);
+
+    const denial = upscaleDenial(user, scale, premium);
+    if (denial) return fail(denial);
 
     const own = unwrapMessageContent(msg.raw.message)?.imageMessage;
     const quoted = msg.quoted?.content?.imageMessage;
@@ -41,8 +52,11 @@ export const upscaleCommand: Command = {
     try {
       const source = image ? await toDataUrl(download, image.mimetype) : url;
 
-      const result = await upscale(source);
+      const result = await upscale(source, scale);
       if (!result) return fail("🚩 Upscale failed, try again.");
+
+      // Counted after the upscaler succeeds, so a failed attempt costs nothing.
+      if (!premium) users.recordUpscale(msg.senderJid);
 
       await reply({
         image: Buffer.from(await result.arrayBuffer()),

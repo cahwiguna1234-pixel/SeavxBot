@@ -50,6 +50,14 @@ describe("touch", () => {
     expect(users.get(PN)!.messageCount).toBe(2);
   });
 
+  test("recordUpscale increments the free-tier allowance usage", () => {
+    users.touch({ jid: PN }, false);
+    users.recordUpscale(PN);
+    users.recordUpscale(PN);
+
+    expect(users.get(PN)!.upscale2Count).toBe(2);
+  });
+
   test("isCommand increments command_count as well", () => {
     users.touch({ jid: PN }, true);
 

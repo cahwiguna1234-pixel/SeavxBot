@@ -13,6 +13,8 @@ export interface User {
   premiumGrantedBy: string | null;
   messageCount: number;
   commandCount: number;
+  /** Successful 2x upscales; the free tier's allowance is counted here. */
+  upscale2Count: number;
   firstSeenAt: number;
   lastSeenAt: number;
 }
@@ -28,6 +30,7 @@ export interface UserStore {
   get(jid: string): User | null;
   grantPremium(jid: string, until: number | null, grantedBy: string): User;
   revokePremium(jid: string): User | null;
+  recordUpscale(jid: string): void;
   /** Demotes every expired grant once; returns how many rows changed. */
   demoteExpired(now?: number): number;
 }
@@ -45,6 +48,7 @@ CREATE TABLE IF NOT EXISTS users (
   premium_granted_by TEXT,
   message_count      INTEGER NOT NULL DEFAULT 0,
   command_count      INTEGER NOT NULL DEFAULT 0,
+  upscale2_count     INTEGER NOT NULL DEFAULT 0,
   first_seen_at      INTEGER NOT NULL,
   last_seen_at       INTEGER NOT NULL
 );
@@ -63,6 +67,7 @@ interface UserRow {
   premium_granted_by: string | null;
   message_count: number;
   command_count: number;
+  upscale2_count: number;
   first_seen_at: number;
   last_seen_at: number;
 }
@@ -78,6 +83,7 @@ const toUser = (row: UserRow): User => ({
   premiumGrantedBy: row.premium_granted_by,
   messageCount: row.message_count,
   commandCount: row.command_count,
+  upscale2Count: row.upscale2_count,
   firstSeenAt: row.first_seen_at,
   lastSeenAt: row.last_seen_at,
 });
@@ -139,6 +145,10 @@ export function createUserStore(db: Database): UserStore {
             premium_granted_by = NULL
       WHERE jid = ?`,
   );
+  // A grant to a user the bot has never seen leaves them with one credit.
+  const recordUpscaleSql = db.query(
+    "UPDATE users SET upscale2_count = upscale2_count + 1 WHERE jid = ?",
+  );
 
   const get = (jid: string): User | null => {
     const row = select.get(jid);
@@ -173,6 +183,10 @@ export function createUserStore(db: Database): UserStore {
     revokePremium(jid) {
       revoke.run(jid);
       return get(jid);
+    },
+
+    recordUpscale(jid) {
+      recordUpscaleSql.run(jid);
     },
 
     demoteExpired(now = Date.now()) {

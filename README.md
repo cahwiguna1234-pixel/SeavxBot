@@ -68,7 +68,12 @@ centre-cropped to a square rather than letterboxed. Both need `ffmpeg` with
 
 | Command | Aliases | Description |
 | --- | --- | --- |
+| `upscale [4]` | `hd`, `remini` | Upscale a photo 2x, or 4x for premium |
 | `removebg` | `nobg`, `rmbg` | Remove the background from a photo |
+
+`upscale` accepts a replied photo, a captioned photo, or a URL. Free users get
+five successful 2x upscales; premium is unlimited and may also pass `4` (or
+`4x`) for a 4x upscale. An attempt the upscaler rejects is not counted.
 
 Accepts the photo the same way `sticker` does. The result is a transparent PNG
 sent as a document, because WhatsApp flattens inline images to JPEG. Runs

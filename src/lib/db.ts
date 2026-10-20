@@ -10,7 +10,7 @@ import {
 import { SCHEDULE_TABLE_SQL } from "@/lib/schedule";
 import { USERS_TABLE_SQL, createUserStore, type UserStore } from "@/lib/users";
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const DEFAULT_PATH = "data/seavxbot.db";
 
 /**
@@ -33,12 +33,20 @@ function migrate(db: Database): void {
   const row = db
     .query<{ user_version: number }, []>("PRAGMA user_version")
     .get();
-  if ((row?.user_version ?? 0) >= SCHEMA_VERSION) return;
+  const version = row?.user_version ?? 0;
+  if (version >= SCHEMA_VERSION) return;
 
   db.transaction(() => {
     db.exec(SETTINGS_TABLE_SQL);
     db.exec(SCHEDULE_TABLE_SQL);
     db.exec(USERS_TABLE_SQL);
+    // Step per version: a database that already has `users` only gains the
+    // column added in v4.
+    if (version < 4) {
+      db.exec(
+        "ALTER TABLE users ADD COLUMN upscale2_count INTEGER NOT NULL DEFAULT 0",
+      );
+    }
     // A literal: PRAGMA does not accept bound parameters.
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   })();
