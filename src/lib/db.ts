@@ -7,8 +7,9 @@ import {
   createSettingsStore,
   type SettingsStore,
 } from "@/lib/settings";
+import { SCHEDULE_TABLE_SQL } from "@/lib/schedule";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const DEFAULT_PATH = "data/seavxbot.db";
 
 /**
@@ -20,6 +21,8 @@ const configuredPath = (): string =>
 
 const FALLBACK_WELCOME = "Welcome {mention} to *{group}*!";
 const FALLBACK_GOODBYE = "Goodbye {name}.";
+const FALLBACK_CLOSE_TIME = "23:00";
+const FALLBACK_OPEN_TIME = "06:00";
 
 /**
  * SQLite's own `user_version` doubles as the migration cursor, so there is no
@@ -33,6 +36,7 @@ function migrate(db: Database): void {
 
   db.transaction(() => {
     db.exec(SETTINGS_TABLE_SQL);
+    db.exec(SCHEDULE_TABLE_SQL);
     // A literal: PRAGMA does not accept bound parameters.
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   })();
@@ -64,6 +68,9 @@ export function getGroupSettings(): SettingsStore {
   store ??= createSettingsStore(getDb(), {
     welcome_text: botConfig.messages?.welcome_text || FALLBACK_WELCOME,
     goodbye_text: botConfig.messages?.goodbye_text || FALLBACK_GOODBYE,
+    auto_close_time:
+      botConfig.schedule?.auto_close_time || FALLBACK_CLOSE_TIME,
+    auto_open_time: botConfig.schedule?.auto_open_time || FALLBACK_OPEN_TIME,
   });
   return store;
 }

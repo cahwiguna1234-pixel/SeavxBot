@@ -13,8 +13,30 @@ export interface BotConfig {
   storage?: {
     path?: string;
   };
+  download?: {
+    /**
+     * How to invoke yt-dlp, as an argv prefix. Use `["python", "-m", "yt_dlp"]`
+     * when the pip launcher is blocked by policy but the module is importable.
+     */
+    ytdlp_command?: string[];
+    /** Shorthand for a single binary; ignored when `ytdlp_command` is set. */
+    ytdlp_path?: string;
+    /** Directory or executable for ffmpeg, needed to merge video + audio. */
+    ffmpeg_path?: string;
+    /** Highest vertical resolution attempted before falling back lower. */
+    max_height?: number;
+    /** Wall-clock budget for one download attempt. */
+    timeout_seconds?: number;
+    /** .ttf used for sticker text; auto-detected when empty. */
+    sticker_font?: string;
+  };
   features?: {
     read_message?: boolean;
+  };
+  schedule?: {
+    /** Local `HH:MM` defaults for groups that enable the nightly schedule. */
+    auto_close_time?: string;
+    auto_open_time?: string;
   };
   messages?: {
     owner_only?: string;

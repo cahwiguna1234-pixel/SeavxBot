@@ -8,13 +8,24 @@ export interface GroupSettings {
   goodbye: boolean;
   goodbye_text: string;
   antilink: AntilinkMode;
+  auto_close: boolean;
+  /** Local `HH:MM`. */
+  auto_close_time: string;
+  auto_open: boolean;
+  /** Local `HH:MM`. */
+  auto_open_time: string;
 }
 
-/** The two values that come from config.toml instead of being fixed. */
+/** The values that come from config.toml instead of being fixed. */
 export interface SettingsDefaults {
   welcome_text: string;
   goodbye_text: string;
+  auto_close_time: string;
+  auto_open_time: string;
 }
+
+/** `00:00`–`23:59`, local time. */
+export const CLOCK_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export interface SettingsStore {
   get(jid: string): GroupSettings;
@@ -43,11 +54,14 @@ export const ANTILINK_MODES: readonly AntilinkMode[] = [
 
 const DEFAULT_SETTINGS: Pick<
   GroupSettings,
-  "welcome" | "goodbye" | "antilink"
+  "welcome" | "goodbye" | "antilink" | "auto_close" | "auto_open"
 > = {
   welcome: false,
   goodbye: false,
   antilink: "off",
+  // Times come from SettingsDefaults; the schedule stays opt-in per group.
+  auto_close: false,
+  auto_open: false,
 };
 
 /**
@@ -61,6 +75,10 @@ const GUARDS: Record<keyof GroupSettings, (value: unknown) => boolean> = {
   goodbye: (value) => typeof value === "boolean",
   goodbye_text: (value) => typeof value === "string",
   antilink: (value) => ANTILINK_MODES.includes(value as AntilinkMode),
+  auto_close: (value) => typeof value === "boolean",
+  auto_close_time: (value) => typeof value === "string" && CLOCK_RE.test(value),
+  auto_open: (value) => typeof value === "boolean",
+  auto_open_time: (value) => typeof value === "string" && CLOCK_RE.test(value),
 };
 
 export function createSettingsStore(

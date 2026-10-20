@@ -25,6 +25,7 @@ import { loadCommands, getCommand } from "@/lib/commandLoader";
 import { getGroupMetadata, invalidateGroupMetadata } from "@/lib/groupCache";
 import { getGroupSettings } from "@/lib/db";
 import { handleParticipantsUpdate } from "@/lib/greeting";
+import { startGroupScheduler } from "@/lib/scheduler";
 import type { Command } from "@/lib/types";
 
 const PAIRING_CODE_DELAY_MS = 3000;
@@ -244,6 +245,7 @@ async function connect(): Promise<void> {
 
     if (connection === "open") {
       console.log("Connected to WhatsApp successfully!");
+      startGroupScheduler(sock);
       return;
     }
     if (connection !== "close") return;

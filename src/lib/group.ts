@@ -243,3 +243,29 @@ export function describeGroup(meta: GroupMetadata): string {
 
   return lines.join("\n");
 }
+
+/**
+ * The scheduler's open/close: no reply and no "already set" guard. Each path
+ * resolves, so one unreachable group cannot stop the others in the same tick.
+ */
+const SCHEDULE_OP = {
+  close: { setting: "announcement", announce: true },
+  open: { setting: "not_announcement", announce: false },
+} as const;
+
+export async function applyGroupOpenState(
+  sock: WASocket,
+  jid: string,
+  action: keyof typeof SCHEDULE_OP,
+): Promise<void> {
+  const { setting, announce } = SCHEDULE_OP[action];
+
+  try {
+    await sock.groupSettingUpdate(jid, setting);
+    patchGroupMetadata(jid, (meta) => ({ ...meta, announce }));
+  } catch (err) {
+    // Usually the bot was demoted while the schedule was still set. Worth a
+    // log, not a crash: the same failure would repeat every night.
+    console.error(`Scheduled ${action} failed for ${jid}:`, describeError(err));
+  }
+}

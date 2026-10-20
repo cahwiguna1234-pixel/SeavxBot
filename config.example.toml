@@ -30,6 +30,31 @@ path = "data/seavxbot.db"
 # Automatically mark incoming messages as read (blue tick / ACK)
 read_message = true
 
+[schedule]
+# Default local times for the nightly close/open. A group opts in with
+# !settings autoclose on / !settings autoopen on and may override the times.
+auto_close_time = "23:00"
+auto_open_time = "06:00"
+
+[download]
+# yt-dlp is required for the YouTube and Instagram downloaders.
+# Simplest form: one binary on PATH.
+ytdlp_path = "yt-dlp"
+# Optional argv prefix, used instead of ytdlp_path when set. Useful when the
+# launcher is blocked by policy but the Python module still runs:
+#   ytdlp_command = ["python", "-m", "yt_dlp"]
+# Optional: ffmpeg executable or directory, needed to merge video + audio.
+# Leave empty to let yt-dlp find it on PATH.
+ffmpeg_path = ""
+# Highest resolution attempted. Lower rungs are tried automatically when a
+# download would exceed WhatsApp's 64 MB media limit.
+max_height = 720
+# Wall-clock budget for a single download attempt, in seconds.
+timeout_seconds = 180
+# Font used for the brat sticker. Leave empty to auto-detect Arial Narrow
+# (ARIALN.TTF on Windows, DejaVu Sans on Linux, Arial Narrow on macOS).
+sticker_font = ""
+
 [messages]
 owner_only = "🚩 This command is reserved for the bot owner."
 admin_only = "🚩 Group admin privileges required."
