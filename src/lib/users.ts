@@ -13,8 +13,10 @@ export interface User {
   premiumGrantedBy: string | null;
   messageCount: number;
   commandCount: number;
-  /** Successful 2x upscales; the free tier's allowance is counted here. */
+  /** Successful 2x upscales on `upscale2Day`; resets when the day changes. */
   upscale2Count: number;
+  /** Local `YYYY-MM-DD` the counter belongs to; null means no use yet. */
+  upscale2Day: string | null;
   firstSeenAt: number;
   lastSeenAt: number;
 }
@@ -49,6 +51,7 @@ CREATE TABLE IF NOT EXISTS users (
   message_count      INTEGER NOT NULL DEFAULT 0,
   command_count      INTEGER NOT NULL DEFAULT 0,
   upscale2_count     INTEGER NOT NULL DEFAULT 0,
+  upscale2_day       TEXT,
   first_seen_at      INTEGER NOT NULL,
   last_seen_at       INTEGER NOT NULL
 );
@@ -68,6 +71,7 @@ interface UserRow {
   message_count: number;
   command_count: number;
   upscale2_count: number;
+  upscale2_day: string | null;
   first_seen_at: number;
   last_seen_at: number;
 }
@@ -84,9 +88,23 @@ const toUser = (row: UserRow): User => ({
   messageCount: row.message_count,
   commandCount: row.command_count,
   upscale2Count: row.upscale2_count,
+  upscale2Day: row.upscale2_day,
   firstSeenAt: row.first_seen_at,
   lastSeenAt: row.last_seen_at,
 });
+
+/** Local calendar day, the unit the free upscale allowance resets on. */
+export function localDay(now: number = Date.now()): string {
+  const date = new Date(now);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** How many 2x upscales the user has used on `day`. */
+export function upscaleCountOn(user: User, day: string): number {
+  return user.upscale2Day === day ? user.upscale2Count : 0;
+}
 
 /** A grant with no expiry is permanent; the role still has to be checked. */
 export function isPremium(user: User, now: number = Date.now()): boolean {
@@ -145,9 +163,13 @@ export function createUserStore(db: Database): UserStore {
             premium_granted_by = NULL
       WHERE jid = ?`,
   );
-  // A grant to a user the bot has never seen leaves them with one credit.
+  // The day is written with the increment, so the first use on a new day starts
+  // the count over instead of adding to yesterday's.
   const recordUpscaleSql = db.query(
-    "UPDATE users SET upscale2_count = upscale2_count + 1 WHERE jid = ?",
+    `UPDATE users
+        SET upscale2_count = CASE WHEN upscale2_day = ? THEN upscale2_count + 1 ELSE 1 END,
+            upscale2_day = ?
+      WHERE jid = ?`,
   );
 
   const get = (jid: string): User | null => {
@@ -186,7 +208,8 @@ export function createUserStore(db: Database): UserStore {
     },
 
     recordUpscale(jid) {
-      recordUpscaleSql.run(jid);
+      const day = localDay();
+      recordUpscaleSql.run(day, day, jid);
     },
 
     demoteExpired(now = Date.now()) {

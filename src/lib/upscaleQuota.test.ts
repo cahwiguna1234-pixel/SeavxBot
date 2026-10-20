@@ -5,7 +5,11 @@ import {
   parseScale,
   upscaleDenial,
 } from "@/lib/upscaleQuota";
-import type { User } from "@/lib/users";
+import { localDay, type User } from "@/lib/users";
+
+const NOW = new Date(2026, 9, 20, 12).getTime();
+const TODAY = localDay(NOW);
+const YESTERDAY = localDay(NOW - 24 * 60 * 60 * 1000);
 
 const user = (over: Partial<User> = {}): User => ({
   id: 1,
@@ -19,6 +23,7 @@ const user = (over: Partial<User> = {}): User => ({
   messageCount: 0,
   commandCount: 0,
   upscale2Count: 0,
+  upscale2Day: null,
   firstSeenAt: 0,
   lastSeenAt: 0,
   ...over,
@@ -39,27 +44,36 @@ describe("parseScale", () => {
 
 describe("upscaleDenial", () => {
   test("free users cannot run 4x", () => {
-    expect(upscaleDenial(user(), 4, false)).toBe(UPSCALE_4X_PREMIUM_ONLY);
+    expect(upscaleDenial(user(), 4, false, NOW)).toBe(UPSCALE_4X_PREMIUM_ONLY);
   });
 
   test("premium users may run 4x", () => {
-    expect(upscaleDenial(user({ role: "premium" }), 4, true)).toBeUndefined();
+    expect(
+      upscaleDenial(user({ role: "premium" }), 4, true, NOW),
+    ).toBeUndefined();
   });
 
-  test("free users get five 2x upscales", () => {
-    expect(upscaleDenial(user({ upscale2Count: 4 }), 2, false)).toBeUndefined();
-    expect(upscaleDenial(user({ upscale2Count: 5 }), 2, false)).toBe(
-      FREE_UPSCALE_EXHAUSTED,
-    );
+  test("free users get five 2x upscales a day", () => {
+    const at4 = user({ upscale2Day: TODAY, upscale2Count: 4 });
+    const at5 = user({ upscale2Day: TODAY, upscale2Count: 5 });
+
+    expect(upscaleDenial(at4, 2, false, NOW)).toBeUndefined();
+    expect(upscaleDenial(at5, 2, false, NOW)).toBe(FREE_UPSCALE_EXHAUSTED);
+  });
+
+  test("yesterday's usage does not count against today", () => {
+    const used5Yesterday = user({ upscale2Day: YESTERDAY, upscale2Count: 5 });
+
+    expect(upscaleDenial(used5Yesterday, 2, false, NOW)).toBeUndefined();
   });
 
   test("a user with no row still gets the free allowance", () => {
-    expect(upscaleDenial(null, 2, false)).toBeUndefined();
+    expect(upscaleDenial(null, 2, false, NOW)).toBeUndefined();
   });
 
   test("premium is unlimited", () => {
     expect(
-      upscaleDenial(user({ upscale2Count: 999 }), 2, true),
+      upscaleDenial(user({ upscale2Count: 999, upscale2Day: TODAY }), 2, true, NOW),
     ).toBeUndefined();
   });
 });

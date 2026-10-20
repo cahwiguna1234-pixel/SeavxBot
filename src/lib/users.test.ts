@@ -4,6 +4,7 @@ import {
   USERS_TABLE_SQL,
   createUserStore,
   isPremium,
+  localDay,
   type UserStore,
 } from "@/lib/users";
 
@@ -50,12 +51,25 @@ describe("touch", () => {
     expect(users.get(PN)!.messageCount).toBe(2);
   });
 
-  test("recordUpscale increments the free-tier allowance usage", () => {
+  test("recordUpscale counts today's usage", () => {
     users.touch({ jid: PN }, false);
     users.recordUpscale(PN);
     users.recordUpscale(PN);
 
-    expect(users.get(PN)!.upscale2Count).toBe(2);
+    const user = users.get(PN)!;
+    expect(user.upscale2Count).toBe(2);
+    expect(user.upscale2Day).toBe(localDay());
+  });
+
+  test("a new day starts the upscale count over", () => {
+    users.touch({ jid: PN }, true);
+    db.query("UPDATE users SET upscale2_count = 5, upscale2_day = '2000-01-01'").run();
+
+    users.recordUpscale(PN);
+
+    const user = users.get(PN)!;
+    expect(user.upscale2Count).toBe(1);
+    expect(user.upscale2Day).toBe(localDay());
   });
 
   test("isCommand increments command_count as well", () => {
