@@ -31,6 +31,8 @@ const user = (over: Partial<User> = {}): User => ({
   commandCount: 0,
   upscale2Count: 0,
   upscale2Day: null,
+  device: null,
+  os: null,
   firstSeenAt: 0,
   lastSeenAt: 0,
   ...over,

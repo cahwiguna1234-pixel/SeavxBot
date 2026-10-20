@@ -30,6 +30,13 @@ path = "data/seavxbot.db"
 # Automatically mark incoming messages as read (blue tick / ACK)
 read_message = true
 
+[device_info]
+# Address a user's phone opens the .deviceinfo link at. Leave empty to use the
+# machine's LAN IP, which only works for users on the same network.
+public_url = ""
+# Port the device-link server listens on.
+port = 3000
+
 [schedule]
 # Default local times for the nightly close/open. A group opts in with
 # !settings autoclose on / !settings autoopen on and may override the times.

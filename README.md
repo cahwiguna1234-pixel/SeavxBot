@@ -91,12 +91,27 @@ settings): role, message/command counts, and first/last seen. New users are
 | --- | --- | --- |
 | `premium 7d\|30d\|permanent [target]` | `upgrade` | Grant premium (owner only) |
 | `unpremium [target]` | `downgrade` | Return a user to free (owner only) |
-| `userinfo [target]` | `profile` | Show role, expiry, and counts (owner only) |
+| `userinfo [target]` | `profile` | Show role, expiry, device, and counts (owner only) |
+| `deviceinfo` | `mydevice` | Send yourself a one-time link that records your phone and OS |
 
 A target is a mentioned user, the replied-to author, a phone number, or nobody
 (meaning yourself). A typed number is checked with WhatsApp before a row is
 created, so a typo cannot create a ghost user. Expiry is lazy: an expired row
 is demoted the next time it is read, plus once at startup.
+
+**Device info.** WhatsApp does not tell the bot which phone or OS a sender uses.
+`userinfo` therefore shows whatever the user last reported through `.deviceinfo`:
+the bot serves a one-time 15-minute link (default port 3000, on `http://<lan-ip>:3000`
+unless configured otherwise) and the page reports the browser and OS it runs on.
+The link only fills the sender's own record, so an owner cannot collect someone
+else's device this way. Configure the public address when the bot is not on the
+same LAN as its users:
+
+```toml
+[device_info]
+public_url = "http://bot.example.com:3000"
+port = 3000
+```
 
 ### Downloader requirements
 

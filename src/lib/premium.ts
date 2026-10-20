@@ -81,6 +81,8 @@ export function describeUser(user: User, now: number = Date.now()): string {
   return [
     `👤 ${labelFor(user.jid)}`,
     `Role: ${user.role}${user.role === "premium" ? ` (until: ${expiry})` : ""}`,
+    `Device: ${user.device ?? "unknown (send .deviceinfo)"}`,
+    `OS: ${user.os ?? "unknown (send .deviceinfo)"}`,
     `Messages: ${user.messageCount}`,
     `Commands: ${user.commandCount}`,
     `First seen: ${when(user.firstSeenAt)}`,

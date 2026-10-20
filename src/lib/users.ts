@@ -17,6 +17,9 @@ export interface User {
   upscale2Count: number;
   /** Local `YYYY-MM-DD` the counter belongs to; null means no use yet. */
   upscale2Day: string | null;
+  /** Last device reported through the one-time device link. */
+  device: string | null;
+  os: string | null;
   firstSeenAt: number;
   lastSeenAt: number;
 }
@@ -33,6 +36,7 @@ export interface UserStore {
   grantPremium(jid: string, until: number | null, grantedBy: string): User;
   revokePremium(jid: string): User | null;
   recordUpscale(jid: string): void;
+  setDevice(jid: string, device: string, os: string): void;
   /** Demotes every expired grant once; returns how many rows changed. */
   demoteExpired(now?: number): number;
 }
@@ -52,6 +56,8 @@ CREATE TABLE IF NOT EXISTS users (
   command_count      INTEGER NOT NULL DEFAULT 0,
   upscale2_count     INTEGER NOT NULL DEFAULT 0,
   upscale2_day       TEXT,
+  device             TEXT,
+  os                 TEXT,
   first_seen_at      INTEGER NOT NULL,
   last_seen_at       INTEGER NOT NULL
 );
@@ -72,6 +78,8 @@ interface UserRow {
   command_count: number;
   upscale2_count: number;
   upscale2_day: string | null;
+  device: string | null;
+  os: string | null;
   first_seen_at: number;
   last_seen_at: number;
 }
@@ -89,6 +97,8 @@ const toUser = (row: UserRow): User => ({
   commandCount: row.command_count,
   upscale2Count: row.upscale2_count,
   upscale2Day: row.upscale2_day,
+  device: row.device,
+  os: row.os,
   firstSeenAt: row.first_seen_at,
   lastSeenAt: row.last_seen_at,
 });
@@ -176,6 +186,9 @@ export function createUserStore(db: Database): UserStore {
             upscale2_day = ?
       WHERE jid = ?`,
   );
+  const setDeviceSql = db.query(
+    "UPDATE users SET device = ?, os = ? WHERE jid = ?",
+  );
 
   const get = (jid: string): User | null => {
     const row = select.get(jid);
@@ -215,6 +228,10 @@ export function createUserStore(db: Database): UserStore {
     recordUpscale(jid) {
       const day = localDay();
       recordUpscaleSql.run(day, day, jid);
+    },
+
+    setDevice(jid, device, os) {
+      setDeviceSql.run(device, os, jid);
     },
 
     demoteExpired(now = Date.now()) {

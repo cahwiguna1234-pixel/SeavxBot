@@ -33,6 +33,12 @@ export interface BotConfig {
   features?: {
     read_message?: boolean;
   };
+  device_info?: {
+    /** Address users open the device link at, e.g. "http://1.2.3.4:3000". */
+    public_url?: string;
+    /** Port the device-link server listens on; defaults to 3000. */
+    port?: number;
+  };
   schedule?: {
     /** Local `HH:MM` defaults for groups that enable the nightly schedule. */
     auto_close_time?: string;

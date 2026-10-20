@@ -10,7 +10,7 @@ import {
 import { SCHEDULE_TABLE_SQL } from "@/lib/schedule";
 import { USERS_TABLE_SQL, createUserStore, type UserStore } from "@/lib/users";
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 const DEFAULT_PATH = "data/seavxbot.db";
 
 /**
@@ -51,6 +51,10 @@ function migrate(db: Database): void {
       // Counts from before v5 are lifetime totals with no day attached, so
       // they start over rather than blocking the first day of the daily quota.
       db.exec("ALTER TABLE users ADD COLUMN upscale2_day TEXT");
+    }
+    if (version < 6) {
+      db.exec("ALTER TABLE users ADD COLUMN device TEXT");
+      db.exec("ALTER TABLE users ADD COLUMN os TEXT");
     }
     // A literal: PRAGMA does not accept bound parameters.
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

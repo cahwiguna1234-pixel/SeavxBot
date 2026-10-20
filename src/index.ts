@@ -26,6 +26,8 @@ import { getGroupMetadata, invalidateGroupMetadata } from "@/lib/groupCache";
 import { getGroupSettings, getUsers } from "@/lib/db";
 import { handleParticipantsUpdate } from "@/lib/greeting";
 import { startGroupScheduler } from "@/lib/scheduler";
+import { claimDeviceLink, describeClient } from "@/lib/deviceInfo";
+import { startDeviceServer, lanUrl } from "@/lib/deviceServer";
 import type { Command } from "@/lib/types";
 
 const PAIRING_CODE_DELAY_MS = 3000;
@@ -308,6 +310,26 @@ async function main(): Promise<void> {
   await loadCommands();
   // Expired grants are demoted here and again lazily on read; no scheduler.
   getUsers().demoteExpired();
+
+  // The device link is served on the LAN by default, so a phone on the same
+  // network can open it without any config. A missing port never stops the bot.
+  const devicePort = botConfig.device_info?.port ?? 3000;
+  try {
+    startDeviceServer(devicePort, (token, hints) => {
+      const jid = claimDeviceLink(token);
+      if (!jid) return null;
+
+      const { device, os } = describeClient(hints);
+      getUsers().setDevice(jid, device, os);
+      return jid;
+    });
+    console.log(
+      `Device links: ${botConfig.device_info?.public_url ?? lanUrl(devicePort)}`,
+    );
+  } catch (err) {
+    console.error("Device link server failed to start:", err);
+  }
+
   await connect();
 }
 

@@ -19,7 +19,7 @@ export const userInfoCommand: Command = {
       const user = users.get(target.jid);
       return user
         ? describeUser(user)
-        : `👤 ${target.label}\nNo record — this user has never talked to the bot.`;
+        : `👤 ${target.label}\nDevice: unknown (they can send .deviceinfo)\nOS: unknown\nNo other record — this user has never talked to the bot.`;
     });
 
     await reply(lines.join("\n\n"));
