@@ -21,6 +21,7 @@ export interface QuotedMessage {
   senderJid: string;
   body: string;
   type: string;
+  content?: proto.IMessage;
 }
 
 export interface ParsedMessage {
@@ -136,6 +137,7 @@ export async function parseMessage(
       senderJid: contextInfo.participant || chatJid,
       body: quotedBody,
       type: quotedType,
+      content: quotedContent,
     };
   }
 

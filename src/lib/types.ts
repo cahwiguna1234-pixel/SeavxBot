@@ -12,6 +12,8 @@ export interface CommandContext {
     content: string | AnyMessageContent,
     options?: MiscMessageGenerationOptions,
   ) => Promise<unknown>;
+  /** Reacts to the invoking message; failures are ignored because it is cosmetic. */
+  react: (text: string) => Promise<unknown>;
 }
 
 export interface Command {

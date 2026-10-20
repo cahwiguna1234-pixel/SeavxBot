@@ -111,6 +111,15 @@ function createReply(sock: WASocket, msg: ParsedMessage) {
   };
 }
 
+/** Reactions are cosmetic: a deleted message or refused reaction must not fail
+ *  the command that sent it. */
+function createReact(sock: WASocket, msg: ParsedMessage) {
+  return (text: string) =>
+    sock
+      .sendMessage(msg.chatJid, { react: { text, key: msg.key } })
+      .catch(() => {});
+}
+
 /** First unmet guard for `cmd`, or undefined when the sender may run it. */
 function denyReason(cmd: Command, msg: ParsedMessage): string | undefined {
   const msgs = botConfig.messages;
@@ -175,7 +184,12 @@ async function handleMessage(sock: WASocket, raw: WAMessage): Promise<void> {
   }
 
   try {
-    await cmd.run({ sock, msg, reply });
+    await cmd.run({
+      sock,
+      msg,
+      reply,
+      react: createReact(sock, msg),
+    });
   } catch (err) {
     console.error(`Error executing command [${cmd.name}]:`, err);
     logToFile("CMD_ERROR", { cmd: cmd.name, error: String(err) });

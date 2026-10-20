@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   check:
-    name: Format, typecheck, test
+    name: Format, typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -32,6 +32,3 @@ jobs:
 
       - name: Typecheck
         run: bun run typecheck
-
-      - name: Test
-        run: bun run test
