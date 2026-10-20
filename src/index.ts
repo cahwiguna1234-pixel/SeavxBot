@@ -23,7 +23,7 @@ import { logToFile } from "@/lib/logger";
 import { botConfig } from "@/lib/config";
 import { loadCommands, getCommand } from "@/lib/commandLoader";
 import { getGroupMetadata, invalidateGroupMetadata } from "@/lib/groupCache";
-import { getGroupSettings } from "@/lib/db";
+import { getGroupSettings, getUsers } from "@/lib/db";
 import { handleParticipantsUpdate } from "@/lib/greeting";
 import { startGroupScheduler } from "@/lib/scheduler";
 import type { Command } from "@/lib/types";
@@ -172,9 +172,18 @@ async function handleMessage(sock: WASocket, raw: WAMessage): Promise<void> {
 
   const reply = createReply(sock, msg);
 
-  if (!msg.isCmd) return;
+  const cmd = msg.isCmd ? getCommand(msg.command) : undefined;
 
-  const cmd = getCommand(msg.command);
+  // Counting is bookkeeping: a failed write must never block the command.
+  try {
+    getUsers().touch(
+      { jid: msg.senderJid, lid: msg.senderLid, name: msg.pushName },
+      Boolean(cmd),
+    );
+  } catch (err) {
+    console.error("Failed to record user activity:", err);
+  }
+
   if (!cmd) return;
 
   const denial = denyReason(cmd, msg);
@@ -297,6 +306,8 @@ async function connect(): Promise<void> {
 
 async function main(): Promise<void> {
   await loadCommands();
+  // Expired grants are demoted here and again lazily on read; no scheduler.
+  getUsers().demoteExpired();
   await connect();
 }
 

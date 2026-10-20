@@ -75,6 +75,23 @@ sent as a document, because WhatsApp flattens inline images to JPEG. Runs
 through [iLoveIMG's](https://www.iloveimg.com/remove-background) public API, so
 it needs no local install — only outbound HTTPS.
 
+### Users & premium
+
+Every inbound message is recorded in `users` (SQLite, next to the group
+settings): role, message/command counts, and first/last seen. New users are
+`free`. Owners grant premium with an expiry or permanently:
+
+| Command | Aliases | Description |
+| --- | --- | --- |
+| `premium 7d\|30d\|permanent [target]` | `upgrade` | Grant premium (owner only) |
+| `unpremium [target]` | `downgrade` | Return a user to free (owner only) |
+| `userinfo [target]` | `profile` | Show role, expiry, and counts (owner only) |
+
+A target is a mentioned user, the replied-to author, a phone number, or nobody
+(meaning yourself). A typed number is checked with WhatsApp before a row is
+created, so a typo cannot create a ghost user. Expiry is lazy: an expired row
+is demoted the next time it is read, plus once at startup.
+
 ### Downloader requirements
 
 - `tiktok` resolves through the public [tikwm](https://www.tikwm.com/) API and

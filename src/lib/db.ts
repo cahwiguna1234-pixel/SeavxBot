@@ -8,8 +8,9 @@ import {
   type SettingsStore,
 } from "@/lib/settings";
 import { SCHEDULE_TABLE_SQL } from "@/lib/schedule";
+import { USERS_TABLE_SQL, createUserStore, type UserStore } from "@/lib/users";
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const DEFAULT_PATH = "data/seavxbot.db";
 
 /**
@@ -37,6 +38,7 @@ function migrate(db: Database): void {
   db.transaction(() => {
     db.exec(SETTINGS_TABLE_SQL);
     db.exec(SCHEDULE_TABLE_SQL);
+    db.exec(USERS_TABLE_SQL);
     // A literal: PRAGMA does not accept bound parameters.
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   })();
@@ -57,6 +59,7 @@ export function openDatabase(file: string): Database {
 
 let handle: Database | undefined;
 let store: SettingsStore | undefined;
+let users: UserStore | undefined;
 
 /** Opened on first use so importing this module never touches the disk. */
 export function getDb(): Database {
@@ -73,4 +76,9 @@ export function getGroupSettings(): SettingsStore {
     auto_open_time: botConfig.schedule?.auto_open_time || FALLBACK_OPEN_TIME,
   });
   return store;
+}
+
+export function getUsers(): UserStore {
+  users ??= createUserStore(getDb());
+  return users;
 }
