@@ -11,6 +11,13 @@ const NOW = new Date(2026, 9, 20, 12).getTime();
 const TODAY = localDay(NOW);
 const YESTERDAY = localDay(NOW - 24 * 60 * 60 * 1000);
 
+describe("localDay", () => {
+  test("rolls over at midnight WIB, not at the server's midnight", () => {
+    expect(localDay(Date.UTC(2026, 9, 19, 16, 59))).toBe("2026-10-19");
+    expect(localDay(Date.UTC(2026, 9, 19, 17, 0))).toBe("2026-10-20");
+  });
+});
+
 const user = (over: Partial<User> = {}): User => ({
   id: 1,
   jid: "6281@s.whatsapp.net",
